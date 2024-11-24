@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "outDir": "./dist",
+    "noEmit": true,
+    "target": "esnext",
+    "module": "commonjs",
+    "lib": ["esnext", "dom"],
+    "jsx": "react",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "allowJs": true,                // Allows JavaScript files in the project
+    "noImplicitAny": false,          // Temporarily disables implicit 'any' warnings
+    "baseUrl": "./"                  // Sets base URL to root directory
+  },
+  "exclude": ["node_modules", "**/*.spec.ts", "**/*.test.ts"]
+}
