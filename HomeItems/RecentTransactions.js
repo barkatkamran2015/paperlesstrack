@@ -66,11 +66,13 @@ const RecentTransactions = () => {
             disney: { icon: 'filmstrip', color: '#0066FF' }, // Entertainment - Blue
             'best buy': { icon: 'television', color: '#FFC107' }, // Electronics - Yellow
             target: { icon: 'bullseye-arrow', color: '#D32F2F' }, // General Store - Red
+            fuel: { icon: 'Gas', color: '#FF9800' },
         };
     
         const categoryMapping = {
             Grocery: { icon: 'cart-outline', color: '#FF5722' },
             Gas: { icon: 'fuel', color: '#FF9800' },
+            fuel: { icon: 'Gas', color: '#FF9800' },
             Food: { icon: 'food-fork-drink', color: '#4CAF50' },
             Restaurants: { icon: 'silverware-fork-knife', color: '#FF5722' },
             Electronics: { icon: 'cellphone', color: '#1E88E5' },

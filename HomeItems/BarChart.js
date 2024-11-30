@@ -17,10 +17,11 @@ const BarChart = () => {
     Grocery: "#ef42f5",// Red
     Furniture: "#36A2EB", // Blue
     'Wholesale Clubs': "#FFCE56", // Yellow
-    'gas station': "#4BC0C0", // Teal
+    'Gas': "#f21313", // Teal
     restaurant: '#b7eb34',
     Utilities: "#9966FF", // Purple
     Retail: "#FFA600", // Orange
+    clothes: "#32a852",
     Uncategorized: "#BDBDBD", // Gray
   };
 
@@ -35,10 +36,15 @@ const BarChart = () => {
       "Wholesale Clubs": "Wholesale Clubs",
       "whole sale club": "Wholesale Clubs",
       "wholesale/retail": "Wholesale Clubs",
+      "wholesale/retail store": "Wholesale Clubs",
       'grocery': "Grocery",
       'groceries': "Grocery",
       'gas': "Gas",
-      'gas': 'gas station',
+      'fuel': "Gas",
+      'Toys': "Furniture",
+      'toys': "Furniture",
+      'gasoline': "Gas",
+      'gas station': 'Gas',
       utilities: "Utilities",
       retail: "Retail",
       "home & garden": "Retail",

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot } from 'firebase/firestore';
 import { firestore } from '../firebaseConfig';
 
 const getGreetingMessage = () => {
@@ -12,50 +12,65 @@ const getGreetingMessage = () => {
 
 const Greeting = ({ userName }) => {
     const [netSavings, setNetSavings] = useState(0);
+    const [totalExpenses, setTotalExpenses] = useState(0);
+    const [totalIncome, setTotalIncome] = useState(0);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const receiptCollectionRef = collection(firestore, 'user_receipts');
-                const incomeCollectionRef = collection(firestore, 'incomes');
+        // Set up real-time listeners for receipts and incomes
+        const receiptCollectionRef = collection(firestore, 'user_receipts');
+        const incomeCollectionRef = collection(firestore, 'incomes');
 
-                const [receiptsSnapshot, incomesSnapshot] = await Promise.all([
-                    getDocs(receiptCollectionRef),
-                    getDocs(incomeCollectionRef),
-                ]);
+        // Real-time listener for receipts
+        const unsubscribeReceipts = onSnapshot(receiptCollectionRef, (snapshot) => {
+            const receipts = snapshot.docs.map((doc) => doc.data());
+            const expenses = calculateTotalExpenses(receipts);
+            setTotalExpenses(expenses);
+        });
 
-                const receipts = receiptsSnapshot.docs.map((doc) => doc.data());
-                const incomes = incomesSnapshot.docs.map((doc) => doc.data());
+        // Real-time listener for incomes
+        const unsubscribeIncomes = onSnapshot(incomeCollectionRef, (snapshot) => {
+            const incomes = snapshot.docs.map((doc) => doc.data());
+            const income = calculateTotalIncome(incomes);
+            setTotalIncome(income);
+        });
 
-                calculateNetSavings(receipts, incomes);
-            } catch (error) {
-                console.error('Error fetching data:', error);
-            } finally {
-                setLoading(false);
-            }
+        setLoading(false); // Stop the loading indicator once listeners are set up
+
+        // Cleanup function to unsubscribe from listeners
+        return () => {
+            unsubscribeReceipts();
+            unsubscribeIncomes();
         };
-
-        fetchData();
     }, []);
 
-    const calculateNetSavings = (receiptList, incomeList) => {
-        let totalExpenses = 0;
-        let totalIncome = 0;
-
-        receiptList.forEach((receipt) => {
-            const { type = 'expense', total = 0 } = receipt;
-            if (type === 'expense') {
-                totalExpenses += total;
-            }
-        });
-
-        incomeList.forEach((income) => {
-            const { total = 0 } = income;
-            totalIncome += total;
-        });
-
+    useEffect(() => {
+        // Calculate net savings whenever totalExpenses or totalIncome changes
         setNetSavings(totalIncome - totalExpenses);
+    }, [totalExpenses, totalIncome]);
+
+    const calculateTotalExpenses = (receiptList = []) => {
+        let totalExpenses = 0;
+        if (Array.isArray(receiptList)) {
+            receiptList.forEach((receipt) => {
+                const { type = 'expense', total = 0 } = receipt || {};
+                if (type === 'expense') {
+                    totalExpenses += total;
+                }
+            });
+        }
+        return totalExpenses;
+    };
+
+    const calculateTotalIncome = (incomeList = []) => {
+        let totalIncome = 0;
+        if (Array.isArray(incomeList)) {
+            incomeList.forEach((income) => {
+                const { total = 0 } = income || {};
+                totalIncome += total;
+            });
+        }
+        return totalIncome;
     };
 
     if (loading) {

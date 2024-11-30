@@ -16,7 +16,10 @@ import {
     updateDoc,
     deleteDoc,
     doc,
+    query,
+    where,
 } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 
 const SetBudget = () => {
     const [budgets, setBudgets] = useState([]); // List of budgets
@@ -24,27 +27,46 @@ const SetBudget = () => {
     const [newBudgetAmount, setNewBudgetAmount] = useState(''); // Input: Budget amount
     const [editingBudgetId, setEditingBudgetId] = useState(null); // For tracking editing state
 
-    // Fetch budgets from Firestore
     useEffect(() => {
-        const unsubscribe = onSnapshot(collection(firestore, "budgets"), (snapshot) => {
+        const auth = getAuth();
+        const user = auth.currentUser;
+
+        if (!user) {
+            console.error("No user is logged in.");
+            return;
+        }
+
+        const budgetsQuery = query(
+            collection(firestore, "budgets"),
+            where("userId", "==", user.uid) // Scope budgets to the logged-in user
+        );
+
+        const unsubscribe = onSnapshot(budgetsQuery, (snapshot) => {
             const budgetList = snapshot.docs.map((doc) => ({
                 id: doc.id,
                 ...doc.data(),
             }));
+            console.log("Fetched budgets:", budgetList);
             setBudgets(budgetList);
         });
 
         return () => unsubscribe();
     }, []);
 
-    // Add a new budget
     const handleAddBudget = async () => {
+        const auth = getAuth();
+        const user = auth.currentUser;
+
+        if (!user) {
+            Alert.alert("Error", "You must be logged in to add a budget.");
+            return;
+        }
+
         if (!newBudgetName.trim() || !newBudgetAmount.trim()) {
             Alert.alert("Validation Error", "Please provide both budget name and amount.");
             return;
         }
 
-        // Prevent duplicate budgets
         if (budgets.some((budget) => budget.name.toLowerCase() === newBudgetName.toLowerCase())) {
             Alert.alert("Duplicate Budget", "A budget with this name already exists.");
             return;
@@ -60,6 +82,7 @@ const SetBudget = () => {
             await addDoc(collection(firestore, "budgets"), {
                 name: newBudgetName.trim(),
                 amount: amount,
+                userId: user.uid, // Attach the logged-in user's ID
             });
 
             setNewBudgetName(""); // Clear input fields
@@ -71,7 +94,6 @@ const SetBudget = () => {
         }
     };
 
-    // Update an existing budget
     const handleUpdateBudget = async (budgetId, updatedAmount) => {
         try {
             const amount = parseFloat(updatedAmount);
@@ -90,7 +112,6 @@ const SetBudget = () => {
         }
     };
 
-    // Delete a budget
     const handleDeleteBudget = async (budgetId) => {
         Alert.alert("Delete Confirmation", "Are you sure you want to delete this budget?", [
             { text: "Cancel", style: "cancel" },
@@ -149,27 +170,33 @@ const SetBudget = () => {
                 )}
                 renderItem={({ item }) => (
                     <View style={styles.budgetItem}>
-                        {/* Budget Name */}
                         <Text style={styles.budgetName}>{item.name}</Text>
-
-                        {/* Budget Amount */}
                         {editingBudgetId === item.id ? (
-                            <TextInput
-                                style={styles.input}
-                                defaultValue={item.amount.toString()}
-                                keyboardType="numeric"
-                                onSubmitEditing={(e) =>
-                                    handleUpdateBudget(item.id, e.nativeEvent.text)
-                                }
-                                onBlur={() => setEditingBudgetId(null)}
-                            />
+                            <View style={styles.editContainer}>
+                                <TextInput
+                                    style={styles.input}
+                                    defaultValue={item.amount.toString()}
+                                    keyboardType="numeric"
+                                    onChangeText={setNewBudgetAmount}
+                                />
+                                <TouchableOpacity
+                                    style={styles.saveButton}
+                                    onPress={() => handleUpdateBudget(item.id, newBudgetAmount)}
+                                >
+                                    <Text style={styles.saveButtonText}>Save</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={styles.cancelButton}
+                                    onPress={() => setEditingBudgetId(null)}
+                                >
+                                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                                </TouchableOpacity>
+                            </View>
                         ) : (
                             <TouchableOpacity onPress={() => setEditingBudgetId(item.id)}>
                                 <Text style={styles.budgetAmount}>${item.amount.toFixed(2)}</Text>
                             </TouchableOpacity>
                         )}
-
-                        {/* Delete Button */}
                         <TouchableOpacity
                             style={styles.deleteButton}
                             onPress={() => handleDeleteBudget(item.id)}
@@ -269,6 +296,27 @@ const styles = StyleSheet.create({
     deleteButtonText: {
         color: "#fff",
         fontWeight: "bold",
+    },
+    editContainer: {
+        flexDirection: "row",
+        alignItems: "center",
+    },
+    saveButton: {
+        backgroundColor: "#4CAF50",
+        padding: 8,
+        borderRadius: 8,
+        marginLeft: 8,
+    },
+    saveButtonText: {
+        color: "#fff",
+        fontWeight: "bold",
+    },
+    cancelButton: {
+        marginLeft: 8,
+        padding: 8,
+    },
+    cancelButtonText: {
+        color: "#888",
     },
 });
 

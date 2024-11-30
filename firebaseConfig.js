@@ -1,8 +1,8 @@
 import { initializeApp } from "firebase/app";
-import { initializeAuth, getReactNativePersistence, signInWithEmailAndPassword } from "firebase/auth";
+import { initializeAuth, getReactNativePersistence, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { getFirestore, collection } from "firebase/firestore";  // Import collection from firestore
-import { getStorage } from "firebase/storage";
+import { getFirestore, collection } from "firebase/firestore"; // Firestore
+import { getStorage } from "firebase/storage"; // Storage
 
 // Firebase configuration object for Receipt Tracker project
 const firebaseConfig = {
@@ -29,7 +29,14 @@ const firestore = getFirestore(app);
 const storage = getStorage(app);
 
 // Get reference to Firestore collection
-const receiptCollectionRef = collection(firestore, 'user_receipts');  // Now it's valid
+const receiptCollectionRef = collection(firestore, 'user_receipts');
 
-// Export Firebase services for use in other parts of the app
-export { auth, firestore, storage, signInWithEmailAndPassword, receiptCollectionRef };
+// Export Firebase services
+export {
+    auth,
+    firestore,
+    storage,
+    signInWithEmailAndPassword,
+    createUserWithEmailAndPassword, // Add this for signup
+    receiptCollectionRef,
+};

@@ -93,12 +93,16 @@ const GraphScreen = () => {
                 'home furnishings': 'Furniture',
                 'furnishings': 'Furniture',
                 'furniture': 'Furniture',
+                'toys': 'Furniture',
                 'wholesale club': 'Wholesale Clubs',
                 'whole sale club': 'Wholesale Clubs',
                 'wholesale/retail': 'Wholesale Clubs',
+                'wholesale/retail store': 'Wholesale Clubs',
                 'grocery': 'Grocery',
                 'groceries': 'Grocery',
                 'gas': 'Gas',
+                'fuel': 'Gas',
+                'gasoline': 'Gas',
                 'utilities': 'Utilities',
                 'retail': 'Retail',
                 'home & garden': 'Retail',
@@ -195,10 +199,12 @@ const GraphScreen = () => {
         switch (normalizedCategory) {
             case 'wholesale club':
             case 'wholesale clubs':
+            case 'wholesale/retail store':
                 return 'cart'; // Wholesale Clubs
             case 'grocery':
                 return 'cart-outline'; // Grocery
             case 'gas':
+            case 'gasoline':
             case 'gas station':
                 return 'gas-station'; // Gas Station
             case 'retail':
@@ -220,6 +226,8 @@ const GraphScreen = () => {
                 return 'hamburger'; // Fast Food
             case 'pizza':
                 return 'pizza'; // Pizza Shops
+            case 'clothes':
+                return 'hanger';
             case 'dessert':
             case 'bakery':
                 return 'cake'; // Bakeries or Dessert Shops

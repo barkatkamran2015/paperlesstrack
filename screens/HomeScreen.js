@@ -18,11 +18,12 @@ import BarChart from '../HomeItems/BarChart';
 import RecentTransactions from '../HomeItems/RecentTransactions';
 import Notifications from '../HomeItems/Notifications';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import { addDoc, collection, getDocs, doc,onSnapshot, getDoc } from 'firebase/firestore';
+import { addDoc, collection, getDocs, query,where, doc,onSnapshot, getDoc } from 'firebase/firestore';
 import { firestore } from '../firebaseConfig';
 import { launchCamera } from 'react-native-image-picker';
 import DocumentPicker from 'react-native-document-picker';
 import axios from 'axios';
+import { getAuth } from "firebase/auth";
 
 MaterialCommunityIcons.loadFont();
 
@@ -46,30 +47,52 @@ const HomeScreen = ({ navigation }) => {
     });
 
     useEffect(() => {
-        fetchUserName();
-        fetchBudget(); // Fetch the budget
-        fetchData();
-        const unsubscribe = subscribeToFirestoreUpdates();
-        return () => unsubscribe();
-    }, []);        
+        const auth = getAuth();
+        const user = auth.currentUser;
+    
+        if (user) {
+            fetchUserName(user.uid);
+            fetchBudget(user.uid); // Fetch the budget specific to the logged-in user
+            fetchData(user.uid);   // Fetch user-specific receipts and other data
+            const unsubscribe = subscribeToFirestoreUpdates(user.uid); // Subscribe to updates for this user
+            return () => unsubscribe(); // Cleanup subscriptions on unmount or logout
+        } else {
+            console.log("No user is logged in.");
+        }
+    }, []);      
 
     const fetchUserName = async () => {
         try {
-            const userUID = '9G8nuXteB8UloYuuioK1FePpBoM2'; // Replace dynamically
-            const userDocRef = doc(firestore, 'users', userUID);
-            const userSnapshot = await getDoc(userDocRef);
-
-            if (userSnapshot.exists()) {
-                const userData = userSnapshot.data();
-                setUserName(`${userData.firstName} ${userData.lastName}`);
+            const auth = getAuth();
+            const user = auth.currentUser;
+    
+            if (user) {
+                const userUID = user.uid; // Get the dynamically logged-in user's UID
+                const userDocRef = doc(firestore, 'users', userUID);
+                console.log('Fetching document from Firestore:', userDocRef.path);
+    
+                const userSnapshot = await getDoc(userDocRef);
+                console.log('Firestore snapshot:', userSnapshot);
+    
+                if (userSnapshot.exists()) {
+                    const userData = userSnapshot.data();
+                    console.log('User data:', userData);
+    
+                    // Use the username field instead of firstName and lastName
+                    setUserName(userData.username || 'User');
+                } else {
+                    console.log('User document not found!');
+                    setUserName('User');
+                }
             } else {
-                console.log('User document not found!');
-                setUserName('User');
+                console.log('No user is signed in');
+                setUserName('Guest');
             }
         } catch (error) {
             console.error('Error fetching user name:', error);
         }
     };
+     
 
     // Subscribe to Firestore updates
     const subscribeToFirestoreUpdates = () => {
@@ -145,12 +168,7 @@ const HomeScreen = ({ navigation }) => {
             (error) => {
                 console.error("Error listening to budgets: ", error);
             }
-        );launchCamera({ mediaType: 'photo' }, (response) => {
-    console.log(response); // Check if camera opens and captures photos
-});
-launchCamera({ mediaType: 'photo' }, (response) => {
-    console.log(response); // Check if camera opens and captures photos
-});
+        );
     
         // Cleanup function
         return () => {
@@ -159,55 +177,83 @@ launchCamera({ mediaType: 'photo' }, (response) => {
         };
     };
     
+const fetchData = async () => {
+    try {
+        const auth = getAuth();
+        const user = auth.currentUser;
 
-    const fetchData = async () => {
-        try {
-            const receiptsSnapshot = await getDocs(collection(firestore, 'user_receipts'));
-            const budgetsSnapshot = await getDocs(collection(firestore, 'budgets'));
-    
-            const receiptList = receiptsSnapshot.docs.map((doc) => doc.data());
-            const budgets = budgetsSnapshot.docs.map((doc) => doc.data());
-            const totalBudget = budgets.reduce((sum, b) => sum + b.amount, 0);
-    
-            let totalExpensesCalc = 0;
-            const categoryMap = {};
-    
-            receiptList.forEach(({ category, total }) => {
-                totalExpensesCalc += total;
-                categoryMap[category] = (categoryMap[category] || 0) + total;
-            });
-    
-            setBarChartData({
-                labels: Object.keys(categoryMap),
-                datasets: [{ data: Object.values(categoryMap) }],
-            });
-    
-            const netSavingsCalc = totalBudget - totalExpensesCalc;
-            const budgetUsedCalc = Math.min((totalExpensesCalc / totalBudget) * 100, 100);
-    
-            setTotalExpenses(totalExpensesCalc);
-            setNetSavings(netSavingsCalc);
-            setBudgetUsed(budgetUsedCalc.toFixed(2));
-            setTransactions(receiptList);
-        } catch (error) {
-            console.error('Error fetching data:', error);
+        if (!user) {
+            console.error("No user is logged in.");
+            return;
         }
-    };    
-    const fetchBudget = async () => {
+
+        const userId = user.uid; // Get the current user's ID
+
+        // Query to fetch only the receipts and budgets for the logged-in user
+        const receiptsQuery = query(
+            collection(firestore, "user_receipts"),
+            where("userId", "==", userId)
+        );
+        const budgetsQuery = query(
+            collection(firestore, "budgets"),
+            where("userId", "==", userId)
+        );
+
+        // Fetch data
+        const receiptsSnapshot = await getDocs(receiptsQuery);
+        const budgetsSnapshot = await getDocs(budgetsQuery);
+
+        const receiptList = receiptsSnapshot.docs.map((doc) => doc.data());
+        const budgets = budgetsSnapshot.docs.map((doc) => doc.data());
+        const totalBudget = budgets.reduce((sum, b) => sum + b.amount, 0);
+
+        let totalExpensesCalc = 0;
+        const categoryMap = {};
+
+        receiptList.forEach(({ category, total }) => {
+            totalExpensesCalc += total;
+            categoryMap[category] = (categoryMap[category] || 0) + total;
+        });
+
+        // Update bar chart data
+        setBarChartData({
+            labels: Object.keys(categoryMap),
+            datasets: [{ data: Object.values(categoryMap) }],
+        });
+
+        // Calculate net savings and budget usage
+        const netSavingsCalc = totalBudget - totalExpensesCalc;
+        const budgetUsedCalc = Math.min((totalExpensesCalc / totalBudget) * 100, 100);
+
+        // Update state
+        setTotalExpenses(totalExpensesCalc);
+        setNetSavings(netSavingsCalc);
+        setBudgetUsed(budgetUsedCalc.toFixed(2));
+        setTransactions(receiptList);
+    } catch (error) {
+        console.error("Error fetching data:", error);
+    }
+};
+   
+    const fetchBudget = async (userId) => {
         try {
-            const budgetSnapshot = await getDocs(collection(firestore, "budgets"));
-            let totalBudget = 0;
+            const budgetQuery = query(
+                collection(firestore, "budgets"),
+                where("userId", "==", userId)
+            );
+            const budgetSnapshot = await getDocs(budgetQuery);
     
+            let totalBudget = 0;
             budgetSnapshot.forEach((doc) => {
-                const budgetData = doc.data();
-                totalBudget += budgetData.amount; // Sum all budgets
+                totalBudget += doc.data().amount;
             });
     
-            setBudget(totalBudget); // Update the budget state
+            setBudget(totalBudget);
         } catch (error) {
             console.error("Error fetching budget: ", error);
         }
     };
+    
 
     const handleSaveManualEntry = async () => {
         // Input validation
@@ -257,33 +303,24 @@ launchCamera({ mediaType: 'photo' }, (response) => {
       };
 
       const handleScanReceipt = async () => {
-        const hasCameraPermission = await requestCameraPermission();
-        if (!hasCameraPermission) {
-            Alert.alert('Permission Denied', 'Camera permission is required to scan receipts.');
-            return;
-        }
-    
-        setIsFabOpen(false); // Close the FAB after triggering scan receipt
-    
         launchCamera({ mediaType: 'photo' }, async (response) => {
-            console.log('Camera Response:', response);
             if (response.didCancel || response.errorCode) {
-                Alert.alert('Error', response.errorMessage || 'Action cancelled or camera error.');
+                Alert.alert('Error', 'Action cancelled or camera error.');
                 return;
             }
-    
+
             const formData = new FormData();
             formData.append('file', {
                 uri: response.assets[0].uri,
                 type: response.assets[0].type,
                 name: response.assets[0].fileName,
             });
-    
+
             try {
-                const res = await axios.post('http://10.0.0.5:5000/api/process-receipt', formData, {
+                const res = await axios.post('https://backend-s2qh.onrender.com/api/process-receipt', formData, {
                     headers: { 'Content-Type': 'multipart/form-data' },
                 });
-    
+
                 await addDoc(collection(firestore, 'user_receipts'), res.data);
                 Alert.alert('Success', 'Receipt scanned and saved.');
                 fetchData();
@@ -293,12 +330,14 @@ launchCamera({ mediaType: 'photo' }, (response) => {
             }
         });
     };
-    
 
+    // Handle file upload
     const handleFileUpload = async () => {
-        setIsFabOpen(false); // Close the FAB after triggering scan receipt
         try {
-            const result = await DocumentPicker.pick({ type: [DocumentPicker.types.allFiles] });
+            const result = await DocumentPicker.pick({
+                type: [DocumentPicker.types.allFiles],
+            });
+
             const formData = new FormData();
             formData.append('file', {
                 uri: result[0].uri,
@@ -306,16 +345,34 @@ launchCamera({ mediaType: 'photo' }, (response) => {
                 name: result[0].name,
             });
 
-            const response = await axios.post('http://10.0.0.89:5000/api/process-receipt', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' },
+            // Add predefined categories for uploading (can be dynamic if required)
+            formData.append('categories', JSON.stringify(['Food', 'Travel', 'Office Supplies', 'Grocery', 'Toys', 'Clothes', 'Pharmacy']));
+
+            const response = await axios.post('https://backend-s2qh.onrender.com/api/process-receipt', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
             });
 
-            await addDoc(collection(firestore, 'user_receipts'), response.data);
-            Alert.alert('Success', 'File uploaded and saved.');
-            fetchData();
-        } catch (error) {
-            console.error('File upload error:', error);
-            Alert.alert('Error', 'Could not upload file.');
+            console.log("API Response:", response.data); // Log the response to inspect data
+
+            const receiptData = response.data;
+
+            // Add the uploaded receipt to Firestore
+            await addDoc(collection(firestore, 'user_receipts'), {
+                vendor: receiptData.vendor || 'Unknown Vendor', // Fallback for vendor
+                items: receiptData.items,
+                total: receiptData.total,
+                category: receiptData.category || 'Uncategorized', // Fallback for category
+                date: receiptData.date || 'N/A',  // Fallback for date
+            });
+
+            Alert.alert('Success', 'Receipt processed successfully and added to Firestore', [
+                { text: 'OK', onPress: () => navigation.navigate('ReceiptList') },
+            ]);
+        } catch (err) {
+            console.error('File upload error:', err);
+            Alert.alert('Error', 'An error occurred while uploading the file');
         }
     };
     
@@ -404,7 +461,10 @@ launchCamera({ mediaType: 'photo' }, (response) => {
             {/* Save Button */}
             <TouchableOpacity
                 style={styles.saveButton}
-                onPress={handleSaveManualEntry} // Trigger the save logic
+                onPress={() => {
+                    handleSaveManualEntry(); // Trigger the save logic
+                    setIsFabOpen(false);
+                }}
             >
                 <Text style={styles.saveButtonText}>Save Entry</Text>
             </TouchableOpacity>
@@ -421,13 +481,19 @@ launchCamera({ mediaType: 'photo' }, (response) => {
                 )}
             <TouchableOpacity
                 style={styles.fabOption}
-                onPress={handleScanReceipt}
+                onPress={() => {
+                    handleScanReceipt(); // Call the receipt scan function
+                    setIsFabOpen(false); // Close the FAB menu
+                }}
             >
                 <MaterialCommunityIcons name="camera" size={24} color="#6200EE" />
             </TouchableOpacity>
             <TouchableOpacity
                 style={styles.fabOption}
-                onPress={handleFileUpload}
+                onPress= {()=> {
+                    handleFileUpload();
+                    setIsFabOpen(false);
+                }}
             >
                 <MaterialCommunityIcons name="file-upload" size={24} color="#6200EE" />
             </TouchableOpacity>

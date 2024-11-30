@@ -3,22 +3,57 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'reac
 import { IconButton } from 'react-native-paper';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { auth, createUserWithEmailAndPassword } from '../firebaseConfig'; // Import Firebase auth
+import { doc, setDoc } from 'firebase/firestore'; // Import Firestore methods
+import { firestore } from '../firebaseConfig'; // Add this line
+
 
 const SignUpScreen = ({ navigation }) => {
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [hidePassword, setHidePassword] = useState(true);
 
   const handleSignUp = async () => {
-    try {
-      await createUserWithEmailAndPassword(auth, email, password);
-      Alert.alert('Registration Successful', 'You can now log in.');
-      // Navigate to the login screen after successful signup
-      navigation.navigate('Login');
-    } catch (error) {
-      Alert.alert('Registration Failed', error.message);
+    if (!email || !password || !username) { // Validate username
+        Alert.alert('Invalid Input', 'Email, password, and username are required.');
+        return;
     }
-  };
+
+    if (password.length < 6) {
+        Alert.alert('Weak Password', 'Password must be at least 6 characters.');
+        return;
+    }
+
+    try {
+        // Create the user in Firebase Authentication
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+
+        // Create a Firestore document for the new user
+        const userDocRef = doc(firestore, 'users', user.uid);
+        await setDoc(userDocRef, {
+            email: user.email,
+            username: username, // Use the username entered by the user
+            registrationDate: new Date().toISOString(), // Record the registration date
+            lastLogin: new Date().toISOString(), // Record the last login
+            income: 0, // Placeholder for income
+        });
+
+        Alert.alert('Registration Successful', 'Your account has been created.');
+        navigation.navigate('Login');
+    } catch (error) {
+        let errorMessage = 'An unknown error occurred. Please try again.';
+        if (error.code === 'auth/email-already-in-use') {
+            errorMessage = 'This email is already in use.';
+        } else if (error.code === 'auth/weak-password') {
+            errorMessage = 'Password should be at least 6 characters.';
+        } else if (error.code === 'auth/invalid-email') {
+            errorMessage = 'Please enter a valid email address.';
+        }
+        Alert.alert('Registration Failed', errorMessage);
+    }
+};
+
 
   return (
     <View style={styles.container}>
@@ -36,6 +71,17 @@ const SignUpScreen = ({ navigation }) => {
 
       <Text style={styles.title}>Paperless Track</Text>
       <Text style={styles.subtitle}>Please create an account to track your daily bills</Text>
+
+      <View style={styles.inputContainer}>
+  <TextInput
+    style={styles.input}
+    placeholder="Username"
+    placeholderTextColor="#fff"
+    value={username}
+    onChangeText={setUsername}
+    autoCapitalize="none"
+  />
+</View>
 
       <View style={styles.inputContainer}>
         <TextInput
